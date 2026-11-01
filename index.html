@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  >
+
+  <title>TaskManager</title>
+
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+
+<body>
+  <main>
+    <h1>TaskManager</h1>
+    <p>Organiza tus tareas y controla tus pendientes.</p>
+
+    <form id="formulario">
+      <label for="titulo">Nueva tarea</label>
+
+      <div class="fila">
+        <input
+          id="titulo"
+          type="text"
+          placeholder="Escribe una tarea"
+          maxlength="120"
+          autocomplete="off"
+          required
+        >
+
+        <button type="submit">Agregar</button>
+      </div>
+    </form>
+
+    <div class="herramientas">
+      <div>
+        <label for="buscar">Buscar tarea</label>
+        <input
+          id="buscar"
+          type="search"
+          placeholder="Buscar por título"
+        >
+      </div>
+
+      <div>
+        <label for="filtro">Estado</label>
+
+        <select id="filtro">
+          <option value="todas">Todas</option>
+          <option value="pendientes">Pendientes</option>
+          <option value="completadas">Completadas</option>
+        </select>
+      </div>
+
+      <button id="importar" type="button">
+        Importar desde API
+      </button>
+    </div>
+
+    <p id="mensaje" role="status" aria-live="polite"></p>
+
+    <p id="resumen"></p>
+
+    <ul id="lista" aria-label="Lista de tareas"></ul>
+  </main>
+</body>
+</html>
