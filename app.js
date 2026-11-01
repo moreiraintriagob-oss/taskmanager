@@ -1,27 +1,29 @@
 "use strict";
 
-// ETAPA 4
-// CRUD, filtros, ordenamiento, API REST y persistencia.
+// ETAPA 5: CustomEvent y funcionamiento offline.
 
 const CLAVE = "taskmanager.v2";
 const API = "https://jsonplaceholder.typicode.com/todos";
+const EVENTO_TAREAS = "tareas:actualizadas";
+
+const porId = id => document.getElementById(id);
 
 const elementos = {
-  formulario: document.getElementById("formulario"),
-  tituloFormulario: document.getElementById("titulo-formulario"),
-  titulo: document.getElementById("titulo"),
-  prioridad: document.getElementById("prioridad"),
-  guardar: document.getElementById("guardar"),
-  cancelar: document.getElementById("cancelar"),
-  conexion: document.getElementById("conexion"),
-  mensaje: document.getElementById("mensaje"),
-  lista: document.getElementById("lista"),
-  total: document.getElementById("total"),
-  pendientes: document.getElementById("pendientes"),
-  completadas: document.getElementById("completadas"),
-  buscar: document.getElementById("buscar"),
-  filtro: document.getElementById("filtro"),
-  orden: document.getElementById("orden")
+  formulario: porId("formulario"),
+  tituloFormulario: porId("titulo-formulario"),
+  titulo: porId("titulo"),
+  prioridad: porId("prioridad"),
+  guardar: porId("guardar"),
+  cancelar: porId("cancelar"),
+  conexion: porId("conexion"),
+  mensaje: porId("mensaje"),
+  lista: porId("lista"),
+  total: porId("total"),
+  pendientes: porId("pendientes"),
+  completadas: porId("completadas"),
+  buscar: porId("buscar"),
+  filtro: porId("filtro"),
+  orden: porId("orden")
 };
 
 let tareas = [];
@@ -29,23 +31,29 @@ let idEnEdicion = null;
 let almacenamientoValido = true;
 let importando = false;
 
-// BOTÓN DE IMPORTACIÓN
-// Se incorpora desde JavaScript sin modificar el HTML.
+// CONTROLES ADICIONALES
 
 const botonAPI = document.createElement("button");
 
-botonAPI.id = "importar-api";
 botonAPI.type = "button";
 botonAPI.classList.add("secundario");
 botonAPI.textContent = "Importar tareas de ejemplo";
 
 elementos.mensaje.before(botonAPI);
 
+const estadoOffline = document.createElement("p");
+
+estadoOffline.setAttribute("role", "status");
+estadoOffline.textContent =
+  "Preparando archivos para uso offline...";
+
+elementos.conexion.after(estadoOffline);
+
 // MENSAJES Y CONEXIÓN
 
-function mostrarMensaje(texto, esError = false) {
+function mostrarMensaje(texto, error = false) {
   elementos.mensaje.textContent = texto;
-  elementos.mensaje.classList.toggle("error", esError);
+  elementos.mensaje.classList.toggle("error", error);
 }
 
 function actualizarConexion() {
@@ -54,12 +62,12 @@ function actualizarConexion() {
     : "Estado de red: sin conexión.";
 }
 
-// VALIDACIÓN
+// VALIDACIONES
 
 function tituloValido(titulo) {
   return (
     typeof titulo === "string" &&
-    titulo.trim().length >= 1 &&
+    titulo.trim().length > 0 &&
     titulo.length <= 120
   );
 }
@@ -82,13 +90,31 @@ function tareaValida(tarea) {
   );
 }
 
+// CUSTOM EVENT Y PATRÓN OBSERVADOR
+
+function notificarCambio(motivo) {
+  document.dispatchEvent(
+    new CustomEvent(EVENTO_TAREAS, {
+      detail: {
+        motivo,
+        total: tareas.length
+      }
+    })
+  );
+}
+
+// Este observador actualiza la interfaz cuando cambia el estado.
+document.addEventListener(EVENTO_TAREAS, () => {
+  renderizarTareas();
+  actualizarMetricas();
+});
+
 // ALMACENAMIENTO LOCAL
 
 function cargarTareas() {
   try {
     const contenido = localStorage.getItem(CLAVE);
 
-    // La clave inexistente activa la carga inicial.
     if (contenido === null) {
       tareas = [];
       return true;
@@ -100,16 +126,17 @@ function cargarTareas() {
       throw new Error("Formato de almacenamiento incorrecto");
     }
 
-    const ids = new Set(datos.map(tarea => tarea.id));
+    const identificadores = new Set(
+      datos.map(tarea => tarea.id)
+    );
 
-    if (ids.size !== datos.length) {
+    if (identificadores.size !== datos.length) {
       throw new Error("Identificadores duplicados");
     }
 
     tareas = datos;
 
-    // Un arreglo vacío guardado también es información válida.
-    // Así no reaparecen automáticamente las tareas eliminadas.
+    // Un arreglo vacío guardado también se respeta.
     return false;
   } catch (error) {
     tareas = [];
@@ -117,7 +144,7 @@ function cargarTareas() {
 
     mostrarMensaje(
       "No se pudieron recuperar los datos. " +
-      "Se bloquearon las modificaciones para evitar sobrescribirlos.",
+      "Revisa el almacenamiento antes de modificar tareas.",
       true
     );
 
@@ -128,7 +155,7 @@ function cargarTareas() {
 function guardarTareas(nuevasTareas) {
   if (!almacenamientoValido) {
     mostrarMensaje(
-      "Revisa el almacenamiento y recarga antes de modificar tareas.",
+      "Se bloquearon los cambios para proteger los datos locales.",
       true
     );
 
@@ -140,20 +167,21 @@ function guardarTareas(nuevasTareas) {
       CLAVE,
       JSON.stringify(nuevasTareas)
     );
-
-    tareas = nuevasTareas;
-    renderizarTareas();
-
-    return true;
   } catch (error) {
     mostrarMensaje(
-      "No se guardaron los cambios. " +
-      "Revisa el espacio y los permisos del navegador.",
+      "No se guardaron los cambios. Revisa espacio y permisos.",
       true
     );
 
     return false;
   }
+
+  tareas = nuevasTareas;
+
+  // Solo se notifica después de guardar correctamente.
+  notificarCambio("modificacion");
+
+  return true;
 }
 
 // CONSTRUCCIÓN DE LA INTERFAZ
@@ -207,15 +235,14 @@ function crearFila(tarea) {
   titulo.textContent = tarea.titulo;
 
   const detalle = document.createElement("small");
-
   detalle.classList.add("tarea-detalle");
 
-  const origenFecha = tarea.id.startsWith("api-")
+  const origen = tarea.id.startsWith("api-")
     ? "Importada"
     : "Creada";
 
   detalle.textContent =
-    origenFecha + ": " +
+    origen + ": " +
     new Date(tarea.creadaEn).toLocaleString("es-EC");
 
   contenido.append(titulo, detalle);
@@ -236,18 +263,18 @@ function crearFila(tarea) {
   return fila;
 }
 
-// MÉTRICAS
+// DASHBOARD
 
 function actualizarMetricas() {
-  const completadas = tareas.filter(
+  const completas = tareas.filter(
     tarea => tarea.completada
   ).length;
 
   elementos.total.textContent = tareas.length;
-  elementos.completadas.textContent = completadas;
+  elementos.completadas.textContent = completas;
 
   elementos.pendientes.textContent =
-    tareas.length - completadas;
+    tareas.length - completas;
 }
 
 // BÚSQUEDA, FILTROS Y ORDENAMIENTO
@@ -273,7 +300,7 @@ function obtenerTareasVisibles() {
     return coincideTitulo && coincideEstado;
   });
 
-  const valorPrioridad = {
+  const valor = {
     alta: 1,
     media: 2,
     baja: 3
@@ -288,11 +315,10 @@ function obtenerTareasVisibles() {
     }
 
     if (orden === "prioridad") {
-      const diferencia =
-        valorPrioridad[primera.prioridad] -
-        valorPrioridad[segunda.prioridad];
-
-      return diferencia || fechaSegunda - fechaPrimera;
+      return (
+        valor[primera.prioridad] -
+        valor[segunda.prioridad]
+      ) || fechaSegunda - fechaPrimera;
     }
 
     return fechaSegunda - fechaPrimera;
@@ -311,28 +337,27 @@ function renderizarTareas() {
 
     aviso.textContent = tareas.length === 0
       ? "Todavía no hay tareas registradas."
-      : "No hay tareas que coincidan con la búsqueda y el filtro.";
+      : "No hay coincidencias para la búsqueda y el filtro.";
 
     elementos.lista.append(aviso);
-  } else {
-    const fragmento = document.createDocumentFragment();
-
-    visibles.forEach(tarea => {
-      fragmento.append(crearFila(tarea));
-    });
-
-    elementos.lista.append(fragmento);
+    return;
   }
 
-  actualizarMetricas();
+  const fragmento = document.createDocumentFragment();
+
+  visibles.forEach(tarea => {
+    fragmento.append(crearFila(tarea));
+  });
+
+  elementos.lista.append(fragmento);
 }
 
 // FORMULARIO Y EDICIÓN
 
 function restablecerFormulario() {
   idEnEdicion = null;
-  elementos.formulario.reset();
 
+  elementos.formulario.reset();
   elementos.tituloFormulario.textContent = "Nueva tarea";
   elementos.guardar.textContent = "Agregar tarea";
   elementos.cancelar.hidden = true;
@@ -380,7 +405,7 @@ function procesarFormulario(evento) {
   }
 
   const esEdicion = idEnEdicion !== null;
-  let nuevasTareas;
+  let siguientes;
 
   if (esEdicion) {
     const existe = tareas.some(
@@ -398,13 +423,13 @@ function procesarFormulario(evento) {
       return;
     }
 
-    nuevasTareas = tareas.map(tarea => {
+    siguientes = tareas.map(tarea => {
       return tarea.id === idEnEdicion
         ? { ...tarea, titulo, prioridad }
         : tarea;
     });
   } else {
-    nuevasTareas = [
+    siguientes = [
       ...tareas,
       {
         id: crypto.randomUUID(),
@@ -416,18 +441,18 @@ function procesarFormulario(evento) {
     ];
   }
 
-  if (guardarTareas(nuevasTareas)) {
+  if (guardarTareas(siguientes)) {
     restablecerFormulario();
 
     mostrarMensaje(
       esEdicion
-        ? "Tarea actualizada correctamente."
+        ? "Tarea actualizada."
         : "Tarea agregada. Si no aparece, revisa la búsqueda y el filtro."
     );
   }
 }
 
-// ELIMINACIÓN Y ESTADO
+// ELIMINACIÓN Y CAMBIO DE ESTADO
 
 function eliminarTarea(id) {
   const tarea = tareas.find(tarea => tarea.id === id);
@@ -436,32 +461,32 @@ function eliminarTarea(id) {
     return;
   }
 
-  if (!confirm(`¿Deseas eliminar la tarea "${tarea.titulo}"?`)) {
+  if (!confirm(`¿Eliminar la tarea "${tarea.titulo}"?`)) {
     return;
   }
 
-  const nuevasTareas = tareas.filter(
+  const siguientes = tareas.filter(
     tarea => tarea.id !== id
   );
 
-  if (guardarTareas(nuevasTareas)) {
+  if (guardarTareas(siguientes)) {
     if (idEnEdicion === id) {
       restablecerFormulario();
     }
 
-    mostrarMensaje("Tarea eliminada correctamente.");
+    mostrarMensaje("Tarea eliminada.");
   }
 }
 
 function cambiarEstado(id, completada) {
-  const nuevasTareas = tareas.map(tarea => {
+  const siguientes = tareas.map(tarea => {
     return tarea.id === id
       ? { ...tarea, completada }
       : tarea;
   });
 
-  if (guardarTareas(nuevasTareas)) {
-    mostrarMensaje("Estado actualizado correctamente.");
+  if (guardarTareas(siguientes)) {
+    mostrarMensaje("Estado actualizado.");
   } else {
     renderizarTareas();
   }
@@ -476,7 +501,7 @@ async function importarTareas() {
 
   if (!almacenamientoValido) {
     mostrarMensaje(
-      "Revisa el almacenamiento antes de importar tareas.",
+      "Revisa el almacenamiento antes de importar.",
       true
     );
 
@@ -487,7 +512,7 @@ async function importarTareas() {
   botonAPI.disabled = true;
   botonAPI.textContent = "Importando...";
 
-  mostrarMensaje("Consultando tareas de JSONPlaceholder...");
+  mostrarMensaje("Consultando JSONPlaceholder...");
 
   const controlador = new AbortController();
 
@@ -522,17 +547,15 @@ async function importarTareas() {
       });
 
     if (!formatoValido) {
-      throw new Error("La API devolvió datos inesperados");
+      throw new Error("Respuesta inesperada");
     }
 
-    // Se consulta el estado vigente al terminar la petición.
-    // Así se conservan los cambios hechos durante la espera.
     const ids = new Set(
       tareas.map(tarea => tarea.id)
     );
 
     const importadas = [];
-    const fechaImportacion = new Date().toISOString();
+    const fecha = new Date().toISOString();
 
     datos.forEach(tarea => {
       const id = `api-${tarea.id}`;
@@ -548,14 +571,13 @@ async function importarTareas() {
         titulo: tarea.title.trim().slice(0, 120),
         prioridad: "media",
         completada: tarea.completed,
-        creadaEn: fechaImportacion
+        creadaEn: fecha
       });
     });
 
     if (importadas.length === 0 && tareas.length > 0) {
       mostrarMensaje(
-        "No hay tareas nuevas para importar. " +
-        "Se conservaron los cambios existentes."
+        "No hay tareas nuevas. Se conservaron tus cambios."
       );
 
       return;
@@ -563,8 +585,7 @@ async function importarTareas() {
 
     if (guardarTareas([...tareas, ...importadas])) {
       mostrarMensaje(
-        `Se importaron ${importadas.length} tareas. ` +
-        "Las tareas existentes se conservaron."
+        `Se importaron ${importadas.length} tareas sin duplicar.`
       );
     }
   } catch (error) {
@@ -573,9 +594,7 @@ async function importarTareas() {
       : "No fue posible consultar el servicio de tareas.";
 
     mostrarMensaje(
-      causa +
-      " Puedes seguir trabajando con tus tareas locales " +
-      "y volver a intentar la importación.",
+      causa + " Puedes seguir utilizando tus tareas locales.",
       true
     );
   } finally {
@@ -587,7 +606,52 @@ async function importarTareas() {
   }
 }
 
-// EVENTOS
+// REGISTRO DEL SERVICE WORKER
+
+async function prepararOffline() {
+  if (!("serviceWorker" in navigator)) {
+    estadoOffline.textContent =
+      "Este navegador no admite el modo offline completo.";
+
+    return;
+  }
+
+  const informarControl = () => {
+    estadoOffline.textContent =
+      "Archivos preparados para uso offline. " +
+      "Conserva esta misma dirección y puerto.";
+  };
+
+  navigator.serviceWorker.addEventListener(
+    "controllerchange",
+    informarControl
+  );
+
+  try {
+    await navigator.serviceWorker.register(
+      "./service-worker.js"
+    );
+
+    await navigator.serviceWorker.ready;
+
+    if (navigator.serviceWorker.controller) {
+      informarControl();
+    } else {
+      estadoOffline.textContent =
+        "Archivos guardados. Recarga para activar el modo offline.";
+    }
+  } catch (error) {
+    if (navigator.serviceWorker.controller) {
+      informarControl();
+    } else {
+      estadoOffline.textContent =
+        "No se pudo preparar el modo offline. " +
+        "Comprueba service-worker.js y abre mediante Live Server.";
+    }
+  }
+}
+
+// EVENTOS DEL USUARIO
 
 elementos.formulario.addEventListener(
   "submit",
@@ -614,14 +678,12 @@ elementos.lista.addEventListener("click", evento => {
     return;
   }
 
-  const id = fila.dataset.id;
-
   if (boton.dataset.accion === "editar") {
-    iniciarEdicion(id);
+    iniciarEdicion(fila.dataset.id);
   }
 
   if (boton.dataset.accion === "eliminar") {
-    eliminarTarea(id);
+    eliminarTarea(fila.dataset.id);
   }
 });
 
@@ -673,8 +735,9 @@ window.addEventListener(
 
 const necesitaCargaInicial = cargarTareas();
 
-renderizarTareas();
+notificarCambio("inicio");
 actualizarConexion();
+prepararOffline();
 
 if (necesitaCargaInicial) {
   importarTareas();
