@@ -15,57 +15,142 @@
 </head>
 
 <body>
-  <main>
-    <h1>TaskManager</h1>
-    <p>Organiza tus tareas y controla tus pendientes.</p>
+  <main class="contenedor">
 
-    <form id="formulario">
-      <label for="titulo">Nueva tarea</label>
+    <header>
+      <p class="etiqueta">ACTIVIDAD INTEGRADORA 2</p>
+      <h1>TaskManager</h1>
+      <p>Organiza tus tareas y consulta tus pendientes.</p>
+      <p id="conexion" role="status"></p>
+    </header>
 
-      <div class="fila">
-        <input
-          id="titulo"
-          type="text"
-          placeholder="Escribe una tarea"
-          maxlength="120"
-          autocomplete="off"
-          required
-        >
+    <section aria-labelledby="titulo-dashboard">
+      <h2 id="titulo-dashboard">Resumen de tareas</h2>
 
-        <button type="submit">Agregar</button>
+      <div class="dashboard">
+        <article class="metrica">
+          <h3>Total</h3>
+          <strong id="total">0</strong>
+        </article>
+
+        <article class="metrica">
+          <h3>Pendientes</h3>
+          <strong id="pendientes">0</strong>
+        </article>
+
+        <article class="metrica">
+          <h3>Completadas</h3>
+          <strong id="completadas">0</strong>
+        </article>
       </div>
-    </form>
+    </section>
 
-    <div class="herramientas">
-      <div>
-        <label for="buscar">Buscar tarea</label>
-        <input
-          id="buscar"
-          type="search"
-          placeholder="Buscar por título"
-        >
+    <section aria-labelledby="titulo-formulario">
+      <h2 id="titulo-formulario">Nueva tarea</h2>
+
+      <form id="formulario" novalidate>
+        <div class="campo">
+          <label for="titulo">Título de la tarea</label>
+
+          <input
+            id="titulo"
+            name="titulo"
+            type="text"
+            maxlength="120"
+            placeholder="Ejemplo: preparar la exposición"
+            autocomplete="off"
+            required
+          >
+        </div>
+
+        <div class="campo">
+          <label for="prioridad">Prioridad</label>
+
+          <select id="prioridad" name="prioridad">
+            <option value="alta">Alta</option>
+            <option value="media" selected>Media</option>
+            <option value="baja">Baja</option>
+          </select>
+        </div>
+
+        <div class="acciones-formulario">
+          <button id="guardar" type="submit">
+            Agregar tarea
+          </button>
+
+          <button
+            id="cancelar"
+            class="secundario"
+            type="button"
+            hidden
+          >
+            Cancelar edición
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <section aria-labelledby="titulo-lista">
+      <h2 id="titulo-lista">Mis tareas</h2>
+
+      <div class="herramientas">
+        <div class="campo">
+          <label for="buscar">Buscar por título</label>
+
+          <input
+            id="buscar"
+            type="search"
+            placeholder="Escribe para buscar"
+          >
+        </div>
+
+        <div class="campo">
+          <label for="filtro">Estado</label>
+
+          <select id="filtro">
+            <option value="todas">Todas</option>
+            <option value="pendientes">Pendientes</option>
+            <option value="completadas">Completadas</option>
+          </select>
+        </div>
+
+        <div class="campo">
+          <label for="orden">Ordenar por</label>
+
+          <select id="orden">
+            <option value="recientes">
+              Fecha: más recientes
+            </option>
+
+            <option value="antiguas">
+              Fecha: más antiguas
+            </option>
+
+            <option value="prioridad">
+              Prioridad: alta a baja
+            </option>
+          </select>
+        </div>
       </div>
 
-      <div>
-        <label for="filtro">Estado</label>
+      <p
+        id="mensaje"
+        class="mensaje"
+        role="status"
+        aria-live="polite"
+      ></p>
 
-        <select id="filtro">
-          <option value="todas">Todas</option>
-          <option value="pendientes">Pendientes</option>
-          <option value="completadas">Completadas</option>
-        </select>
-      </div>
+      <ul
+        id="lista"
+        class="lista"
+        aria-label="Lista de tareas"
+      ></ul>
+    </section>
 
-      <button id="importar" type="button">
-        Importar desde API
-      </button>
-    </div>
+    <footer>
+      JavaScript Vanilla · DOM · API REST · localStorage
+    </footer>
 
-    <p id="mensaje" role="status" aria-live="polite"></p>
-
-    <p id="resumen"></p>
-
-    <ul id="lista" aria-label="Lista de tareas"></ul>
   </main>
 </body>
 </html>

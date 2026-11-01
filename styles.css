@@ -1,27 +1,95 @@
+:root {
+  --fondo: #eef2f7;
+  --superficie: #ffffff;
+  --texto: #172033;
+  --secundario: #64748b;
+  --principal: #2563eb;
+  --borde: #d8e0ea;
+  --error: #b91c1c;
+}
+
 * {
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
-  background: #eef2f7;
-  color: #172033;
+  background: var(--fondo);
+  color: var(--texto);
   font-family: Arial, sans-serif;
   line-height: 1.5;
 }
 
-main {
-  max-width: 900px;
-  margin: 35px auto;
+.contenedor {
+  width: min(1000px, calc(100% - 32px));
+  margin: 30px auto;
   padding: 30px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+  background: var(--superficie);
+  border-radius: 14px;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08);
+}
+
+header {
+  margin-bottom: 28px;
+}
+
+.etiqueta {
+  color: var(--secundario);
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 1px;
 }
 
 h1 {
-  margin-top: 0;
-  color: #1d4ed8;
+  margin: 0;
+  font-size: 36px;
+}
+
+h2 {
+  margin-top: 28px;
+  font-size: 21px;
+}
+
+.dashboard {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.metrica {
+  padding: 18px;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.metrica h3 {
+  margin: 0 0 8px;
+  color: var(--secundario);
+  font-size: 15px;
+}
+
+.metrica strong {
+  font-size: 30px;
+}
+
+form,
+.herramientas {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 14px;
+}
+
+.herramientas {
+  grid-template-columns: 2fr 1fr 1fr;
+}
+
+.campo {
+  min-width: 0;
 }
 
 label {
@@ -33,25 +101,29 @@ label {
 input,
 select,
 button {
-  padding: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
   border-radius: 6px;
   font: inherit;
 }
 
 input,
 select {
-  border: 1px solid #cbd5e1;
+  width: 100%;
+  border: 1px solid var(--borde);
+  background: white;
+  color: var(--texto);
 }
 
 button {
-  border: 1px solid #2563eb;
-  background: #2563eb;
+  border: 1px solid var(--principal);
+  background: var(--principal);
   color: white;
   cursor: pointer;
 }
 
 button:hover {
-  background: #1d4ed8;
+  filter: brightness(0.92);
 }
 
 button:disabled {
@@ -66,75 +138,114 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
-.fila {
+.acciones-formulario {
+  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
 }
 
-#titulo {
-  flex: 1;
-  min-width: 180px;
+.secundario {
+  border-color: var(--borde);
+  background: white;
+  color: var(--texto);
 }
 
-.herramientas {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 15px;
-  margin-top: 25px;
-}
-
-.herramientas input,
-.herramientas select {
-  width: 100%;
-}
-
-#mensaje {
+.mensaje {
   min-height: 24px;
   color: #1d4ed8;
 }
 
-#resumen {
-  padding: 12px;
-  background: #eef2f7;
-  border-radius: 6px;
-  font-weight: bold;
+.mensaje.error {
+  color: var(--error);
 }
 
-#lista {
+.lista {
   padding: 0;
   list-style: none;
 }
 
-li {
+.tarea {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  padding: 14px 0;
-  border-bottom: 1px solid #cbd5e1;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--borde);
 }
 
-li span {
+.tarea input[type="checkbox"] {
+  width: 20px;
+  min-height: 20px;
+}
+
+.tarea-contenido {
   flex: 1;
-  min-width: 150px;
+  min-width: 180px;
+}
+
+.tarea-titulo {
+  display: block;
   overflow-wrap: anywhere;
 }
 
-.completada {
-  color: #64748b;
+.tarea-detalle {
+  display: block;
+  margin-top: 4px;
+  color: var(--secundario);
+  font-size: 13px;
+}
+
+.completada .tarea-titulo {
+  color: var(--secundario);
   text-decoration: line-through;
 }
 
-@media (max-width: 600px) {
-  main {
-    margin: 15px;
+.prioridad {
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.prioridad.alta {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.prioridad.media {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.prioridad.baja {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.eliminar {
+  border-color: var(--error);
+  background: var(--error);
+}
+
+footer {
+  margin-top: 30px;
+  color: var(--secundario);
+  font-size: 13px;
+}
+
+@media (max-width: 650px) {
+  .contenedor {
     padding: 20px;
   }
 
-  .herramientas > div,
-  .herramientas > button {
-    width: 100%;
+  .dashboard,
+  form,
+  .herramientas {
+    grid-template-columns: 1fr;
+  }
+
+  h1 {
+    font-size: 30px;
   }
 }
