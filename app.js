@@ -1,9 +1,10 @@
 "use strict";
 
-// ETAPA 2
-// Gestión CRUD, validación y persistencia local.
+// ETAPA 4
+// CRUD, filtros, ordenamiento, API REST y persistencia.
 
 const CLAVE = "taskmanager.v2";
+const API = "https://jsonplaceholder.typicode.com/todos";
 
 const elementos = {
   formulario: document.getElementById("formulario"),
@@ -17,14 +18,30 @@ const elementos = {
   lista: document.getElementById("lista"),
   total: document.getElementById("total"),
   pendientes: document.getElementById("pendientes"),
-  completadas: document.getElementById("completadas")
+  completadas: document.getElementById("completadas"),
+  buscar: document.getElementById("buscar"),
+  filtro: document.getElementById("filtro"),
+  orden: document.getElementById("orden")
 };
 
 let tareas = [];
 let idEnEdicion = null;
 let almacenamientoValido = true;
+let importando = false;
 
-// MENSAJES
+// BOTÓN DE IMPORTACIÓN
+// Se incorpora desde JavaScript sin modificar el HTML.
+
+const botonAPI = document.createElement("button");
+
+botonAPI.id = "importar-api";
+botonAPI.type = "button";
+botonAPI.classList.add("secundario");
+botonAPI.textContent = "Importar tareas de ejemplo";
+
+elementos.mensaje.before(botonAPI);
+
+// MENSAJES Y CONEXIÓN
 
 function mostrarMensaje(texto, esError = false) {
   elementos.mensaje.textContent = texto;
@@ -65,15 +82,16 @@ function tareaValida(tarea) {
   );
 }
 
-// ALMACENAMIENTO
+// ALMACENAMIENTO LOCAL
 
 function cargarTareas() {
   try {
     const contenido = localStorage.getItem(CLAVE);
 
+    // La clave inexistente activa la carga inicial.
     if (contenido === null) {
       tareas = [];
-      return;
+      return true;
     }
 
     const datos = JSON.parse(contenido);
@@ -89,6 +107,10 @@ function cargarTareas() {
     }
 
     tareas = datos;
+
+    // Un arreglo vacío guardado también es información válida.
+    // Así no reaparecen automáticamente las tareas eliminadas.
+    return false;
   } catch (error) {
     tareas = [];
     almacenamientoValido = false;
@@ -98,6 +120,8 @@ function cargarTareas() {
       "Se bloquearon las modificaciones para evitar sobrescribirlos.",
       true
     );
+
+    return false;
   }
 }
 
@@ -118,7 +142,6 @@ function guardarTareas(nuevasTareas) {
     );
 
     tareas = nuevasTareas;
-
     renderizarTareas();
 
     return true;
@@ -133,7 +156,7 @@ function guardarTareas(nuevasTareas) {
   }
 }
 
-// INTERFAZ
+// CONSTRUCCIÓN DE LA INTERFAZ
 
 function crearBoton(texto, accion, titulo) {
   const boton = document.createElement("button");
@@ -179,16 +202,21 @@ function crearFila(tarea) {
   contenido.classList.add("tarea-contenido");
 
   const titulo = document.createElement("span");
-  titulo.classList.add("tarea-titulo");
 
-  // textContent evita interpretar el título como HTML.
+  titulo.classList.add("tarea-titulo");
   titulo.textContent = tarea.titulo;
 
   const detalle = document.createElement("small");
+
   detalle.classList.add("tarea-detalle");
 
+  const origenFecha = tarea.id.startsWith("api-")
+    ? "Importada"
+    : "Creada";
+
   detalle.textContent =
-    "Creada: " + new Date(tarea.creadaEn).toLocaleString("es-EC");
+    origenFecha + ": " +
+    new Date(tarea.creadaEn).toLocaleString("es-EC");
 
   contenido.append(titulo, detalle);
 
@@ -197,28 +225,18 @@ function crearFila(tarea) {
   prioridad.classList.add("prioridad", tarea.prioridad);
   prioridad.textContent = tarea.prioridad.toUpperCase();
 
-  const editar = crearBoton(
-    "Editar",
-    "editar",
-    tarea.titulo
-  );
-
-  const eliminar = crearBoton(
-    "Eliminar",
-    "eliminar",
-    tarea.titulo
-  );
-
   fila.append(
     casilla,
     contenido,
     prioridad,
-    editar,
-    eliminar
+    crearBoton("Editar", "editar", tarea.titulo),
+    crearBoton("Eliminar", "eliminar", tarea.titulo)
   );
 
   return fila;
 }
+
+// MÉTRICAS
 
 function actualizarMetricas() {
   const completadas = tareas.filter(
@@ -227,23 +245,79 @@ function actualizarMetricas() {
 
   elementos.total.textContent = tareas.length;
   elementos.completadas.textContent = completadas;
+
   elementos.pendientes.textContent =
     tareas.length - completadas;
 }
 
+// BÚSQUEDA, FILTROS Y ORDENAMIENTO
+
+function obtenerTareasVisibles() {
+  const consulta = elementos.buscar.value
+    .trim()
+    .toLowerCase();
+
+  const estado = elementos.filtro.value;
+  const orden = elementos.orden.value;
+
+  const visibles = tareas.filter(tarea => {
+    const coincideTitulo = tarea.titulo
+      .toLowerCase()
+      .includes(consulta);
+
+    const coincideEstado =
+      estado === "todas" ||
+      (estado === "pendientes" && !tarea.completada) ||
+      (estado === "completadas" && tarea.completada);
+
+    return coincideTitulo && coincideEstado;
+  });
+
+  const valorPrioridad = {
+    alta: 1,
+    media: 2,
+    baja: 3
+  };
+
+  visibles.sort((primera, segunda) => {
+    const fechaPrimera = Date.parse(primera.creadaEn);
+    const fechaSegunda = Date.parse(segunda.creadaEn);
+
+    if (orden === "antiguas") {
+      return fechaPrimera - fechaSegunda;
+    }
+
+    if (orden === "prioridad") {
+      const diferencia =
+        valorPrioridad[primera.prioridad] -
+        valorPrioridad[segunda.prioridad];
+
+      return diferencia || fechaSegunda - fechaPrimera;
+    }
+
+    return fechaSegunda - fechaPrimera;
+  });
+
+  return visibles;
+}
+
 function renderizarTareas() {
+  const visibles = obtenerTareasVisibles();
+
   elementos.lista.replaceChildren();
 
-  if (tareas.length === 0) {
+  if (visibles.length === 0) {
     const aviso = document.createElement("li");
 
-    aviso.textContent = "Todavía no hay tareas registradas.";
+    aviso.textContent = tareas.length === 0
+      ? "Todavía no hay tareas registradas."
+      : "No hay tareas que coincidan con la búsqueda y el filtro.";
 
     elementos.lista.append(aviso);
   } else {
     const fragmento = document.createDocumentFragment();
 
-    tareas.forEach(tarea => {
+    visibles.forEach(tarea => {
       fragmento.append(crearFila(tarea));
     });
 
@@ -257,8 +331,8 @@ function renderizarTareas() {
 
 function restablecerFormulario() {
   idEnEdicion = null;
-
   elementos.formulario.reset();
+
   elementos.tituloFormulario.textContent = "Nueva tarea";
   elementos.guardar.textContent = "Agregar tarea";
   elementos.cancelar.hidden = true;
@@ -297,7 +371,6 @@ function procesarFormulario(evento) {
     );
 
     elementos.titulo.focus();
-
     return;
   }
 
@@ -306,8 +379,8 @@ function procesarFormulario(evento) {
     return;
   }
 
-  let nuevasTareas;
   const esEdicion = idEnEdicion !== null;
+  let nuevasTareas;
 
   if (esEdicion) {
     const existe = tareas.some(
@@ -331,15 +404,16 @@ function procesarFormulario(evento) {
         : tarea;
     });
   } else {
-    const nuevaTarea = {
-      id: crypto.randomUUID(),
-      titulo,
-      prioridad,
-      completada: false,
-      creadaEn: new Date().toISOString()
-    };
-
-    nuevasTareas = [...tareas, nuevaTarea];
+    nuevasTareas = [
+      ...tareas,
+      {
+        id: crypto.randomUUID(),
+        titulo,
+        prioridad,
+        completada: false,
+        creadaEn: new Date().toISOString()
+      }
+    ];
   }
 
   if (guardarTareas(nuevasTareas)) {
@@ -348,12 +422,12 @@ function procesarFormulario(evento) {
     mostrarMensaje(
       esEdicion
         ? "Tarea actualizada correctamente."
-        : "Tarea agregada correctamente."
+        : "Tarea agregada. Si no aparece, revisa la búsqueda y el filtro."
     );
   }
 }
 
-// ELIMINACIÓN Y CAMBIO DE ESTADO
+// ELIMINACIÓN Y ESTADO
 
 function eliminarTarea(id) {
   const tarea = tareas.find(tarea => tarea.id === id);
@@ -362,11 +436,7 @@ function eliminarTarea(id) {
     return;
   }
 
-  const confirmado = confirm(
-    `¿Deseas eliminar la tarea "${tarea.titulo}"?`
-  );
-
-  if (!confirmado) {
+  if (!confirm(`¿Deseas eliminar la tarea "${tarea.titulo}"?`)) {
     return;
   }
 
@@ -393,8 +463,127 @@ function cambiarEstado(id, completada) {
   if (guardarTareas(nuevasTareas)) {
     mostrarMensaje("Estado actualizado correctamente.");
   } else {
-    // Restaura la casilla si no se pudo guardar.
     renderizarTareas();
+  }
+}
+
+// CONSUMO DE API REST
+
+async function importarTareas() {
+  if (importando) {
+    return;
+  }
+
+  if (!almacenamientoValido) {
+    mostrarMensaje(
+      "Revisa el almacenamiento antes de importar tareas.",
+      true
+    );
+
+    return;
+  }
+
+  importando = true;
+  botonAPI.disabled = true;
+  botonAPI.textContent = "Importando...";
+
+  mostrarMensaje("Consultando tareas de JSONPlaceholder...");
+
+  const controlador = new AbortController();
+
+  const temporizador = setTimeout(() => {
+    controlador.abort();
+  }, 10000);
+
+  try {
+    const respuesta = await fetch(API, {
+      signal: controlador.signal,
+      cache: "no-store"
+    });
+
+    if (!respuesta.ok) {
+      throw new Error("Error HTTP " + respuesta.status);
+    }
+
+    const datos = await respuesta.json();
+
+    const formatoValido =
+      Array.isArray(datos) &&
+      datos.every(tarea => {
+        return (
+          tarea !== null &&
+          typeof tarea === "object" &&
+          Number.isInteger(tarea.id) &&
+          tarea.id > 0 &&
+          typeof tarea.title === "string" &&
+          tarea.title.trim().length > 0 &&
+          typeof tarea.completed === "boolean"
+        );
+      });
+
+    if (!formatoValido) {
+      throw new Error("La API devolvió datos inesperados");
+    }
+
+    // Se consulta el estado vigente al terminar la petición.
+    // Así se conservan los cambios hechos durante la espera.
+    const ids = new Set(
+      tareas.map(tarea => tarea.id)
+    );
+
+    const importadas = [];
+    const fechaImportacion = new Date().toISOString();
+
+    datos.forEach(tarea => {
+      const id = `api-${tarea.id}`;
+
+      if (ids.has(id)) {
+        return;
+      }
+
+      ids.add(id);
+
+      importadas.push({
+        id,
+        titulo: tarea.title.trim().slice(0, 120),
+        prioridad: "media",
+        completada: tarea.completed,
+        creadaEn: fechaImportacion
+      });
+    });
+
+    if (importadas.length === 0 && tareas.length > 0) {
+      mostrarMensaje(
+        "No hay tareas nuevas para importar. " +
+        "Se conservaron los cambios existentes."
+      );
+
+      return;
+    }
+
+    if (guardarTareas([...tareas, ...importadas])) {
+      mostrarMensaje(
+        `Se importaron ${importadas.length} tareas. ` +
+        "Las tareas existentes se conservaron."
+      );
+    }
+  } catch (error) {
+    const causa = error.name === "AbortError"
+      ? "La consulta superó el tiempo de espera."
+      : "No fue posible consultar el servicio de tareas.";
+
+    mostrarMensaje(
+      causa +
+      " Puedes seguir trabajando con tus tareas locales " +
+      "y volver a intentar la importación.",
+      true
+    );
+  } finally {
+    clearTimeout(temporizador);
+
+    importando = false;
+    botonAPI.disabled = false;
+    botonAPI.textContent = "Importar tareas de ejemplo";
   }
 }
 
@@ -445,18 +634,48 @@ elementos.lista.addEventListener("change", evento => {
 
   const fila = casilla.closest("li[data-id]");
 
-  if (!fila) {
-    return;
+  if (fila) {
+    cambiarEstado(fila.dataset.id, casilla.checked);
   }
-
-  cambiarEstado(fila.dataset.id, casilla.checked);
 });
 
-window.addEventListener("online", actualizarConexion);
-window.addEventListener("offline", actualizarConexion);
+elementos.buscar.addEventListener(
+  "input",
+  renderizarTareas
+);
 
-// INICIO
+elementos.filtro.addEventListener(
+  "change",
+  renderizarTareas
+);
 
-cargarTareas();
+elementos.orden.addEventListener(
+  "change",
+  renderizarTareas
+);
+
+botonAPI.addEventListener(
+  "click",
+  importarTareas
+);
+
+window.addEventListener(
+  "online",
+  actualizarConexion
+);
+
+window.addEventListener(
+  "offline",
+  actualizarConexion
+);
+
+// INICIALIZACIÓN
+
+const necesitaCargaInicial = cargarTareas();
+
 renderizarTareas();
 actualizarConexion();
+
+if (necesitaCargaInicial) {
+  importarTareas();
+}
